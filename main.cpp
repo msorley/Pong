@@ -2,7 +2,7 @@
 #include <raymath.h>
 #include <cmath>
 
-const static float maxTimer = 0.15f;
+const static float maxTimer = 0.2f;
 const static float maxSpeed = 650.0f;
 
 float SqrtInterpolate(float a, float b, float t) {
@@ -17,37 +17,25 @@ enum class ActivePlayer {
 
 struct Player {
     Vector2 position = {};
-    float speed = 0;
-    float timer = 0;
     float direction = 1;
+    float timer = 0;
     int score = 0;
 
-    void Update(float deltaTime, float padding, int widthBound, int heightBound, bool isActive) {
-        if (isActive) {
+    void Update(float deltaTime, float padding, int heightBound, bool isActive) {
+        if (isActive && (IsKeyDown(KEY_W) || IsKeyDown(KEY_S))) {
+            timer += deltaTime;
             if (IsKeyDown(KEY_W)) {
-                timer = std::min(timer + deltaTime, maxTimer);
-                speed = SqrtInterpolate(0, maxSpeed, timer / maxTimer);
-                position.y -= speed * deltaTime;
                 direction = -1;
-            }
-            if (IsKeyDown(KEY_S)) {
-                timer = std::min(timer + deltaTime, maxTimer);
-                speed = SqrtInterpolate(0, maxSpeed, timer / maxTimer);
-                position.y += speed * deltaTime;
+            } else {
                 direction = 1;
             }
-            if (!IsKeyDown(KEY_W) && !IsKeyDown(KEY_S)) {
-                timer = std::max(timer - deltaTime, 0.0f);
-                speed = SqrtInterpolate(0, maxSpeed, timer / maxTimer);
-                position.y += speed * deltaTime * direction;
-            }
         } else {
-            timer = std::max(timer - deltaTime, 0.0f);
-            speed = SqrtInterpolate(0, maxSpeed, timer / maxTimer);
-            position.y += speed * deltaTime * direction;
+            timer -= deltaTime;
         }
+        timer = Clamp(timer, 0, maxTimer);
 
-        position.x = Clamp(position.x, padding, widthBound);
+        const float t = std::sqrt(timer / maxTimer);
+        position.y += direction * maxSpeed * t * deltaTime;
         position.y = Clamp(position.y, padding, heightBound);
     }
 };
@@ -80,7 +68,6 @@ int main() {
     const float fixedDeltaTime = 1 / 120.0;
 
     const float maxAngleHeight = 2 * std::atan(screenHeight / (float)screenWidth);
-    const int widthBound = screenWidth - playerSize.x - padding;
     const int heightBound = screenHeight - playerSize.y - padding;
 
     float ballSpeed = 650;
@@ -118,13 +105,10 @@ int main() {
         }
 
         Player* currentPlayer = nullptr;
-        Player* otherPlayer = nullptr;
         if (activePlayer == ActivePlayer::Left) {
             currentPlayer = &playerLeft;
-            otherPlayer = &playerRight;
         } else {
             currentPlayer = &playerRight;
-            otherPlayer = &playerLeft;
         }
         Vector2& playerPosition = currentPlayer->position;
         Rectangle playerRectangle = {
@@ -134,8 +118,8 @@ int main() {
             playerSize.y,
         };
 
-        currentPlayer->Update(fixedDeltaTime, padding, widthBound, heightBound, true);
-        otherPlayer->Update(fixedDeltaTime, padding, widthBound, heightBound, false);
+        playerLeft.Update(fixedDeltaTime, padding, heightBound, activePlayer == ActivePlayer::Left);
+        playerRight.Update(fixedDeltaTime, padding, heightBound, activePlayer == ActivePlayer::Right);
 
         ball.position = Vector2Add(ball.position, Vector2Scale(ball.velocity, fixedDeltaTime));
 
